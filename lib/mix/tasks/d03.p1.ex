@@ -20,7 +20,7 @@ defmodule Mix.Tasks.D03.P1 do
     01010
     """
 
-    # input = AdventOfCode.Input.get!(3, 2021)
+    input = AdventOfCode.Input.get!(3, 2021)
 
     if Enum.member?(args, "-b"),
       do: Benchee.run(%{part_1: fn -> input |> part1() end}),
