@@ -61,6 +61,7 @@ defmodule AdventOfCode.Day09 do
     |> Enum.reduce(&(&1 * &2))
   end
 
+  # depth first search
   def find_basin(heightmap, stack, visited \\ [])
   def find_basin(_heightmap, [], visited), do: visited
 
