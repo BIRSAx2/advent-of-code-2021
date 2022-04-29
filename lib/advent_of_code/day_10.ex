@@ -1,139 +1,69 @@
 defmodule AdventOfCode.Day10 do
-  @opening_braces ["(", "<", "[", "{"]
+  @opening_braces %{"(" => ")", "<" => ">", "[" => "]", "{" => "}"}
   @closing_braces %{")" => "(", ">" => "<", "]" => "[", "}" => "{"}
 
   defp parse(args) do
     args
     |> String.split("\n", trim: true)
+    |> Enum.map(&String.split(&1, "", trim: true))
   end
 
   def part1(args) do
+    points = %{")" => 3, "]" => 57, "}" => 1197, ">" => 25137}
+
     args
     |> parse()
-    |> Enum.map(fn line ->
-      line
-      |> String.split("", trim: true)
-      |> Enum.reduce_while({[], nil}, fn brace, {opened, _first_incorret} ->
-        if brace in @opening_braces do
-          {:cont, {[brace | opened], nil}}
-        else
-          # stack behaviour
-          [last | rest] =
-            case length(opened) do
-              0 -> [nil, nil]
-              1 -> [hd(opened), nil]
-              _ -> opened
-            end
-
-          if Map.get(@closing_braces, brace) == last do
-            {:cont, {rest, nil}}
-          else
-            {:halt, {rest, brace}}
-          end
-        end
-      end)
-    end)
-    |> Enum.map(fn {_, first_incorrect} ->
-      first_incorrect
-    end)
-    |> Enum.filter(&(&1 != nil))
-    |> calculate_points()
-  end
-
-  defp calculate_points(braces) do
-    braces
+    |> Enum.map(&recur(&1))
+    |> Enum.filter(&(not is_list(&1)))
     |> Enum.frequencies()
     |> Enum.map(fn {brace, count} ->
-      count *
-        case brace do
-          ")" -> 3
-          "]" -> 57
-          "}" -> 1197
-          ">" -> 25137
-        end
+      count * Map.get(points, brace)
     end)
     |> Enum.sum()
   end
 
   def part2(args) do
-    braces = %{"(" => ")", "<" => ">", "[" => "]", "{" => "}"}
+    points = %{")" => 1, "]" => 2, "}" => 3, ">" => 4}
 
     scores =
       args
       |> parse()
-      |> Enum.filter(&is_incorrect(&1))
-      |> Enum.map(fn line ->
-        line
-        |> String.split("", trim: true)
-        |> Enum.reduce([], fn brace, open_braces ->
-          if brace in @opening_braces do
-            [brace | open_braces]
-          else
-            # stack behaviour
-            [last | rest] =
-              case length(open_braces) do
-                0 -> [nil, nil]
-                1 -> [hd(open_braces), nil]
-                _ -> open_braces
-              end
-
-            if Map.get(@closing_braces, brace) == last do
-              rest
-            else
-              open_braces
-            end
-          end
+      |> Enum.map(&recur(&1))
+      |> Enum.filter(&is_list/1)
+      |> Enum.map(
+        &Enum.reduce(&1, 0, fn brace, total ->
+          total * 5 + Map.get(points, brace)
         end)
-      end)
-      |> Enum.map(fn open_braces ->
-        open_braces
-        |> Enum.map(&Map.get(braces, &1))
-      end)
-      |> Enum.map(fn line ->
-        line
-        |> Enum.filter(&(&1 != nil))
-        |> Enum.reduce(0, fn brace, acc ->
-          value =
-            case brace do
-              ")" -> 1
-              "]" -> 2
-              "}" -> 3
-              ">" -> 4
-            end
-
-          acc * 5 + value
-        end)
-      end)
+      )
       |> Enum.sort()
 
-    middle_index = scores |> length() |> div(2)
+    middle_index = length(scores) |> div(2)
     Enum.at(scores, middle_index)
   end
 
-  defp is_incorrect(line) do
-    {_, first_incorrect} =
-      line
-      |> String.split("", trim: true)
-      |> Enum.reduce_while({[], nil}, fn brace, {opened, _first_incorret} ->
-        if brace in @opening_braces do
-          {:cont, {[brace | opened], nil}}
-        else
-          # stack behaviour
-          [last | rest] =
-            case length(opened) do
-              0 -> [nil, nil]
-              1 -> [hd(opened), nil]
-              _ -> opened
-            end
+  # recur returns the first incorrect closing brace, if the line is corrupt, or a list of closing braces when the line is incomplete
+  defp recur(line, open \\ [], close \\ [])
 
-          if Map.get(@closing_braces, brace) == last do
-            {:cont, {rest, nil}}
-          else
-            {:halt, {rest, brace}}
-          end
-        end
-      end)
+  defp recur(_line, _open, brace) when not is_list(brace), do: brace
 
-    first_incorrect == nil
+  defp recur([], _open, close), do: close
+
+  defp recur(line, open, close) do
+    [brace | remaining_line] = line
+
+    if brace in Map.keys(@opening_braces) do
+      close = [Map.get(@opening_braces, brace) | close]
+      open = [brace | open]
+
+      recur(remaining_line, open, close)
+    else
+      [last | rest] = open
+
+      if Map.get(@closing_braces, brace) == last do
+        recur(remaining_line, rest, tl(close))
+      else
+        recur(remaining_line, rest, brace)
+      end
+    end
   end
 end
