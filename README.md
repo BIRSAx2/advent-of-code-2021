@@ -1,77 +1,19 @@
 # Advent of Code 2021 Elixir Solutions 
 
-A batteries included starter pack for participating in [Advent of Code](https://www.adventofcode.com) using Elixir!
+My [Advent of Code](https://www.adventofcode.com)'s solutions using Elixir!
 
 ## Usage
 
 There are 25 modules, 25 tests, and 50 mix tasks.
 
-1. Fill in the tests with the example solutions.
-1. Write your implementation.
-1. Fill in the final problem inputs into the mix task and run `mix d01.p1`!
-    - Benchmark your solution by passing the `-b` flag, `mix d01.p1 -b`
+- Run `mix d01.p1` to get the result of the part 1 of day 1
+- Benchmark the solution by passing the `-b` flag, `mix d01.p1 -b`
 
-```elixir
-defmodule AdventOfCode.Day01 do
-  def part1(args) do
-  end
 
-  def part2(args) do
-  end
-end
-```
+### Automatic Input Retriever
 
-```elixir
-defmodule AdventOfCode.Day01Test do
-  use ExUnit.Case
-
-  import AdventOfCode.Day01
-
-  @tag :skip # Make sure to remove to run your test.
-  test "part1" do
-    input = nil
-    result = part1(input)
-
-    assert result
-  end
-
-  @tag :skip # Make sure to remove to run your test.
-  test "part2" do
-    input = nil
-    result = part2(input)
-
-    assert result
-  end
-end
-```
-
-```elixir
-defmodule Mix.Tasks.D01.P1 do
-  use Mix.Task
-
-  import AdventOfCode.Day01
-
-  @shortdoc "Day 01 Part 1"
-  def run(args) do
-    input = AdventOfCode.Input.get!(1, 2020)
-
-    if Enum.member?(args, "-b"),
-      do: Benchee.run(%{part_1: fn -> input |> part1() end}),
-      else:
-        input
-        |> part1()
-        |> IO.inspect(label: "Part 1 Results")
-  end
-end
-```
-
-### Optional Automatic Input Retriever
-
-This starter comes with a module that will automatically get your inputs so you
-don't have to mess with copy/pasting. Don't worry, it automatically caches your
-inputs to your machine so you don't have to worry about slamming the Advent of
-Code server. You will need to configure it with your cookie and make sure to
-enable it. You can do this by creating a `config/secrets.exs` file containing
+This repo comes with a module that will automatically get the inputs to avoid to mess with copy/pasting. It automatically caches the inputs in order to avoid slamming the Advent of Code server. 
+You will need to configure it with your cookie and make sure to enable it. You can do this by creating a `config/secrets.exs` file containing
 the following:
 
 ```elixir
@@ -99,12 +41,8 @@ AdventOfCode.Input.delete!(7, 2019)
 
 ```bash
 # clone
-$ git clone git@github.com:mhanberg/advent-of-code-elixir-starter.git advent-of-code
+$ git clone git@github.com:BIRSAx2/advent-of-code.git
 $ cd advent-of-code
-
-# Reinitialize your git repo
-$ rm -rf .git && rm -rf .github
-$ git init
 ```
 ### Get started coding with zero configuration
 
