@@ -5,7 +5,28 @@ defmodule Mix.Tasks.D14.P2 do
 
   @shortdoc "Day 14 Part 2"
   def run(args) do
-    input = nil
+    input = """
+    NNCB
+
+    CH -> B
+    HH -> N
+    CB -> H
+    NH -> C
+    HB -> C
+    HC -> B
+    HN -> C
+    NN -> C
+    BH -> H
+    NC -> B
+    NB -> B
+    BN -> B
+    BB -> N
+    BC -> B
+    CC -> N
+    CN -> C
+    """
+
+    input = AdventOfCode.Input.get!(14, 2021)
 
     if Enum.member?(args, "-b"),
       do: Benchee.run(%{part_2: fn -> input |> part2() end}),
