@@ -3,116 +3,139 @@ defmodule AdventOfCode.Day16 do
     parsed =
       args
       |> String.trim()
-      |> String.to_integer(16)
-      |> Integer.digits(2)
+      |> String.split("", trim: true)
+      |> Enum.map(fn digits ->
+        digits
+        |> String.to_integer(16)
+        |> Integer.digits(2)
+        |> Enum.join()
+        |> String.pad_leading(4, "0")
+      end)
+      |> List.flatten()
+      |> Enum.join()
+      |> String.split("", trim: true)
+      |> Enum.map(&String.to_integer(&1, 2))
 
-    expected_length = 4 * ceil(length(parsed) / 4)
+    parsed
+  end
 
-    packet_length = length(parsed)
-
-    padding =
-      cond do
-        expected_length == packet_length -> []
-        true -> for _i <- 1..(expected_length - packet_length), do: 0
-      end
-
-    padding ++ parsed
+  defp to_hex() do
   end
 
   def part1(args) do
     packets =
       parse(args)
-      |> parse_packet()
-
-    packets
-    |> Enum.map(&Map.get(&1, :version))
-    |> Enum.sum()
+      |> parse_packets()
+      |> Enum.map(&Map.get(&1, :version))
+      |> Enum.sum()
   end
 
-  defp parse_packet(packet, packets \\ [])
-  defp parse_packet([], packets), do: packets
+  defp parse_packets(packets) do
+    {parsed, _} =
+      packets
+      |> Enum.reduce(
+        {[], %{}},
+        fn bit, {parsed, current} ->
+          current =
+            cond do
+              # Common header
+              length(Map.get(current, :version, [])) < 3 ->
+                Map.update(current, :version, [bit], &(&1 ++ [bit]))
 
-  defp parse_packet(packet, packets) do
-    if Enum.all?(packet, &(&1 == 0)) do
-      parse_packet([])
-    else
-      [version, type_id] =
-        packet
-        |> Enum.take(6)
-        |> Enum.chunk_every(3)
-        |> Enum.map(&Integer.undigits(&1, 2))
+              length(Map.get(current, :type, [])) < 3 ->
+                Map.update(current, :type, [bit], &(&1 ++ [bit]))
 
-      p = %{version: version, type_id: type_id}
+              # Handling literal packets
+              Integer.undigits(Map.get(current, :type), 2) == 4 and
+                  not Map.get(current, :groups_end, false) ->
+                current = Map.update(current, :current_group, [bit], &(&1 ++ [bit]))
+                # length(Map.get(current, :groups)) |> IO.write()
 
-      packets = [p | packets]
+                group = Map.get(current, :current_group, [])
 
-      payload = Enum.drop(packet, 6)
+                cond do
+                  length(group) == 5 and hd(group) == 0 ->
+                    current
+                    |> Map.update(
+                      :groups,
+                      [tl(Map.get(current, :current_group))],
+                      &(&1 ++ [tl(Map.get(current, :current_group))])
+                    )
+                    |> Map.put(:current_group, [])
+                    |> Map.put(:groups_end, true)
 
-      payload = if Enum.all?(payload, &(&1 == 0)), do: [], else: payload
+                  length(group) == 5 ->
+                    current
+                    |> Map.update(
+                      :groups,
+                      [tl(Map.get(current, :current_group))],
+                      &(&1 ++ [tl(Map.get(current, :current_group))])
+                    )
+                    |> Map.put(:current_group, [])
 
-      parse_payload(payload, type_id, packets)
-    end
-  end
+                  true ->
+                    current
+                end
 
-  defp parse_payload(payload, 4, [current_packet | packets]) do
-    payload = Enum.chunk_every(payload, 5)
+              # handling operator packets
+              Map.get(current, :length_type, nil) == nil ->
+                Map.put(current, :length_type, bit)
 
-    [h | new_payload] = Enum.drop_while(payload, fn g -> not List.starts_with?(g, [0]) end)
+              Map.get(current, :length_type) == 0 and
+                  length(Map.get(current, :total_length, [])) < 15 ->
+                Map.update(current, :total_length, [bit], &(&1 ++ [bit]))
 
-    groups = Enum.take_while(payload, fn g -> not List.starts_with?(g, [0]) end) ++ [h]
-    payload = new_payload |> List.flatten()
+              Map.get(current, :length_type) == 1 and
+                  length(Map.get(current, :number_of_subpackets, [])) < 11 ->
+                Map.update(current, :number_of_subpackets, [bit], &(&1 ++ [bit]))
 
-    literal_value =
-      groups
-      |> Enum.map(&tl/1)
-      |> List.flatten()
-      |> Integer.undigits(2)
+              true ->
+                current
+            end
 
-    packets = [Map.put(current_packet, :value, literal_value) | packets]
-    payload = if Enum.all?(payload, &(&1 == 0)), do: [], else: payload
+          cond do
+            Map.get(current, :groups_end, false) ->
+              value = Map.get(current, :groups) |> List.flatten() |> Integer.undigits(2)
+              current = Map.put(current, :value, value)
+              {parsed ++ [current], %{}}
 
-    parse_packet(payload, packets)
-  end
+            length(Map.get(current, :total_length, [])) == 15 ->
+              current = Map.update!(current, :total_length, &Integer.undigits(&1, 2))
 
-  defp parse_payload(payload, _type, packets) do
-    [length_type_id | payload] = payload
+              {parsed ++ [current], %{}}
 
-    {length_sub_packet, payload} =
-      case length_type_id do
-        0 ->
-          {
-            Enum.take(payload, 15),
-            Enum.drop(payload, 15)
-          }
+            length(Map.get(current, :number_of_subpackets, [])) == 11 ->
+              current = Map.update!(current, :number_of_subpackets, &Integer.undigits(&1, 2))
 
-        1 ->
-          {Enum.take(payload, 11), Enum.drop(payload, 11)}
-      end
+              {parsed ++ [current], %{}}
 
-    length_sub_packet = Integer.undigits(length_sub_packet, 2)
+            true ->
+              {parsed, current}
+          end
+        end
+      )
 
-    new_payload = if length_type_id == 1, do: payload, else: Enum.take(payload, length_sub_packet)
-
-    payload = if Enum.all?(payload, &(&1 == 0)), do: [], else: payload
-
-    packets =
-      if length_type_id != 1,
-        do: parse_packet(Enum.drop(payload, length_sub_packet), packets),
-        else: packets
-
-    new_payload = if Enum.all?(new_payload, &(&1 == 0)), do: [], else: payload
-
-    parse_packet(new_payload, packets)
+    parsed
+    |> Enum.map(fn packet ->
+      packet
+      |> Map.keys()
+      |> Enum.reduce(packet, fn key, packet ->
+        if(is_list(Map.get(packet, key))) do
+          Map.put(packet, key, Integer.undigits(List.flatten(Map.get(packet, key)), 2))
+        else
+          packet
+        end
+      end)
+    end)
   end
 
   def part2(args) do
     packets =
-      parse(args)
-      |> parse_packet()
-      |> IO.inspect(label: "lib/advent_of_code/day_16.ex:112")
+      args
+      |> parse()
+      |> parse_packets()
+      |> IO.inspect(label: "parsed packets")
 
-    packets
-    |> Enum.map(&Map.get(&1, :version))
-    |> Enum.sum()
+    nil
   end
 end

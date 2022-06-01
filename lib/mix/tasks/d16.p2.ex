@@ -6,13 +6,13 @@ defmodule Mix.Tasks.D16.P2 do
   @shortdoc "Day 16 Part 2"
   def run(args) do
     input = """
-    8A004A801A8002F478
+    9C0141080250320F1802104A08
     """
 
     # input = AdventOfCode.Input.get!(16, 2021)
 
     if Enum.member?(args, "-b"),
-      do: Benchee.run(%{part_2: fn -> input |> part2() end}),
+      do: Benchee.run(%{part2: fn -> input |> part2() end}),
       else:
         input
         |> part2()
