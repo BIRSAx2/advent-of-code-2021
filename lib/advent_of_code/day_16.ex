@@ -1,141 +1,83 @@
 defmodule AdventOfCode.Day16 do
-  defp parse(args) do
-    parsed =
-      args
-      |> String.trim()
-      |> String.split("", trim: true)
-      |> Enum.map(fn digits ->
-        digits
-        |> String.to_integer(16)
-        |> Integer.digits(2)
-        |> Enum.join()
-        |> String.pad_leading(4, "0")
-      end)
-      |> List.flatten()
-      |> Enum.join()
-      |> String.split("", trim: true)
-      |> Enum.map(&String.to_integer(&1, 2))
-
-    parsed
+  defmodule Packet do
+    defstruct [:version, :type, :value]
   end
 
-  defp to_hex() do
+  defp parse(args) do
+    args
+    |> String.trim()
+    |> Base.decode16!()
+  end
+
+  defp decode(<<version::3, 4::3, rest::bitstring>>) do
+    {value, rest} = decode_literal(rest, 0)
+    {%Packet{type: :literal, version: version, value: value}, rest}
+  end
+
+  defp decode(<<version::3, type::3, 0::1, length::15, rest::bitstring>>) do
+    <<subpackets::bitstring-size(length), rest::bitstring>> = rest
+
+    {%Packet{type: type, version: version, value: decode_subpackets(subpackets)}, rest}
+  end
+
+  defp decode(<<version::3, type::3, 1::1, length::11, rest::bitstring>>) do
+    {value, rest} = Enum.map_reduce(1..length, rest, fn _, acc -> decode(acc) end)
+    {%Packet{type: type, version: version, value: value}, rest}
+  end
+
+  defp decode_subpackets(subpackets) do
+    case decode(subpackets) do
+      {packet, <<>>} -> [packet]
+      {packet, rest} -> [packet | decode_subpackets(rest)]
+    end
+  end
+
+  defp decode_literal(<<1::1, bits::4, rest::bitstring>>, acc) do
+    decode_literal(rest, acc * 0x10 + bits)
+  end
+
+  defp decode_literal(<<0::1, bits::4, rest::bitstring>>, acc) do
+    {acc * 0x10 + bits, rest}
+  end
+
+  defp sum_versions(%Packet{type: :literal, version: version}), do: version
+
+  defp sum_versions(%Packet{version: version, value: value}) do
+    Enum.reduce(value, version, &(sum_versions(&1) + &2))
   end
 
   def part1(args) do
-    packets =
-      parse(args)
-      |> parse_packets()
-      |> Enum.map(&Map.get(&1, :version))
-      |> Enum.sum()
-  end
+    {packets, _} =
+      args
+      |> parse()
+      |> decode()
 
-  defp parse_packets(packets) do
-    {parsed, _} =
-      packets
-      |> Enum.reduce(
-        {[], %{}},
-        fn bit, {parsed, current} ->
-          current =
-            cond do
-              # Common header
-              length(Map.get(current, :version, [])) < 3 ->
-                Map.update(current, :version, [bit], &(&1 ++ [bit]))
-
-              length(Map.get(current, :type, [])) < 3 ->
-                Map.update(current, :type, [bit], &(&1 ++ [bit]))
-
-              # Handling literal packets
-              Integer.undigits(Map.get(current, :type), 2) == 4 and
-                  not Map.get(current, :groups_end, false) ->
-                current = Map.update(current, :current_group, [bit], &(&1 ++ [bit]))
-                # length(Map.get(current, :groups)) |> IO.write()
-
-                group = Map.get(current, :current_group, [])
-
-                cond do
-                  length(group) == 5 and hd(group) == 0 ->
-                    current
-                    |> Map.update(
-                      :groups,
-                      [tl(Map.get(current, :current_group))],
-                      &(&1 ++ [tl(Map.get(current, :current_group))])
-                    )
-                    |> Map.put(:current_group, [])
-                    |> Map.put(:groups_end, true)
-
-                  length(group) == 5 ->
-                    current
-                    |> Map.update(
-                      :groups,
-                      [tl(Map.get(current, :current_group))],
-                      &(&1 ++ [tl(Map.get(current, :current_group))])
-                    )
-                    |> Map.put(:current_group, [])
-
-                  true ->
-                    current
-                end
-
-              # handling operator packets
-              Map.get(current, :length_type, nil) == nil ->
-                Map.put(current, :length_type, bit)
-
-              Map.get(current, :length_type) == 0 and
-                  length(Map.get(current, :total_length, [])) < 15 ->
-                Map.update(current, :total_length, [bit], &(&1 ++ [bit]))
-
-              Map.get(current, :length_type) == 1 and
-                  length(Map.get(current, :number_of_subpackets, [])) < 11 ->
-                Map.update(current, :number_of_subpackets, [bit], &(&1 ++ [bit]))
-
-              true ->
-                current
-            end
-
-          cond do
-            Map.get(current, :groups_end, false) ->
-              value = Map.get(current, :groups) |> List.flatten() |> Integer.undigits(2)
-              current = Map.put(current, :value, value)
-              {parsed ++ [current], %{}}
-
-            length(Map.get(current, :total_length, [])) == 15 ->
-              current = Map.update!(current, :total_length, &Integer.undigits(&1, 2))
-
-              {parsed ++ [current], %{}}
-
-            length(Map.get(current, :number_of_subpackets, [])) == 11 ->
-              current = Map.update!(current, :number_of_subpackets, &Integer.undigits(&1, 2))
-
-              {parsed ++ [current], %{}}
-
-            true ->
-              {parsed, current}
-          end
-        end
-      )
-
-    parsed
-    |> Enum.map(fn packet ->
-      packet
-      |> Map.keys()
-      |> Enum.reduce(packet, fn key, packet ->
-        if(is_list(Map.get(packet, key))) do
-          Map.put(packet, key, Integer.undigits(List.flatten(Map.get(packet, key)), 2))
-        else
-          packet
-        end
-      end)
-    end)
+    sum_versions(packets)
   end
 
   def part2(args) do
-    packets =
+    {packets, _} =
       args
       |> parse()
-      |> parse_packets()
-      |> IO.inspect(label: "parsed packets")
+      |> decode()
 
-    nil
+    evaluate(packets)
+  end
+
+  defp evaluate(%Packet{type: :literal, value: value}), do: value
+  defp evaluate(%Packet{type: 0} = packet), do: reduce(packet, 0, &+/2)
+  defp evaluate(%Packet{type: 1} = packet), do: reduce(packet, 1, &*/2)
+  defp evaluate(%Packet{type: 2} = packet), do: reduce(packet, :inf, &min/2)
+  defp evaluate(%Packet{type: 3} = packet), do: reduce(packet, 0, &max/2)
+  defp evaluate(%Packet{type: 5} = packet), do: compare(packet, &>/2)
+  defp evaluate(%Packet{type: 6} = packet), do: compare(packet, &</2)
+  defp evaluate(%Packet{type: 7} = packet), do: compare(packet, &==/2)
+
+  defp reduce(%Packet{value: value}, initial, op) do
+    Enum.reduce(value, initial, &op.(evaluate(&1), &2))
+  end
+
+  defp compare(%Packet{value: [a, b]}, op) do
+    if op.(evaluate(a), evaluate(b)), do: 1, else: 0
   end
 end
